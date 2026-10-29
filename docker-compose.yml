@@ -1,0 +1,15 @@
+# One container: the API and the web app on port 3000, state in the `halcyon-contabil-data` volume.
+# On a Vultr VM: `docker compose up -d --build`, then put HTTPS in front (Caddy or Coolify; see docs/DEPLOY-VULTR.md).
+services:
+  halcyon-contabil:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATA_DIR: /data
+    ports:
+      - "3000:3000"
+    volumes:
+      - halcyon-contabil-data:/data
+volumes:
+  halcyon-contabil-data:
