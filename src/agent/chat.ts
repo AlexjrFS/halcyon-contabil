@@ -6,6 +6,7 @@ import type { BetaRunnableTool } from '@anthropic-ai/sdk/lib/tools/BetaRunnableT
 import { z } from 'zod'
 import type { Proposal } from '../approvals/proposals.js'
 import { SYSTEM_PROMPT } from './prompt.js'
+import { converseVultr, DEFAULT_VULTR_MODEL } from './vultr.js'
 
 // Haiku 5.5 matched Opus 5.5 on the demo scenes (plan explanation, proposal, injected invoice) at a fraction
 // of the cost and latency: the model only explains numbers the tools computed. ANTHROPIC_MODEL overrides it
@@ -29,7 +30,7 @@ export type ChatEvent =
   | { type: 'end' }
   | { type: 'error'; message: string }
 
-export async function* converse(
+export async function* converseAnthropic(
   messages: ChatMessage[],
   // Built with a callback that pushes into `queue`: see agentTools(..., onProposal)
   tools: BetaRunnableTool<any>[],
@@ -90,4 +91,28 @@ export async function* converse(
   } else {
     yield { type: 'end' }
   }
+}
+
+// Which model service answers. LLM_PROVIDER=vultr|anthropic forces it; otherwise a Vultr key without an
+// Anthropic key selects Vultr Serverless Inference, and anything else uses Claude.
+export type Provider = 'anthropic' | 'vultr'
+export function activeProvider(env: NodeJS.ProcessEnv = process.env): Provider {
+  const forced = env.LLM_PROVIDER?.trim().toLowerCase()
+  if (forced === 'vultr' || forced === 'anthropic') return forced
+  return env.VULTR_INFERENCE_API_KEY && !env.ANTHROPIC_API_KEY ? 'vultr' : 'anthropic'
+}
+
+export function activeModel(env: NodeJS.ProcessEnv = process.env): string {
+  return activeProvider(env) === 'vultr' ? env.VULTR_MODEL || DEFAULT_VULTR_MODEL : env.ANTHROPIC_MODEL || DEFAULT_MODEL
+}
+
+export function converse(
+  messages: ChatMessage[],
+  tools: BetaRunnableTool<any>[],
+  queue: Proposal[],
+  options: { client?: Anthropic; context: string; signal?: AbortSignal },
+): AsyncGenerator<ChatEvent> {
+  return activeProvider() === 'vultr'
+    ? converseVultr(messages, tools, queue, { context: options.context, signal: options.signal })
+    : converseAnthropic(messages, tools, queue, options)
 }

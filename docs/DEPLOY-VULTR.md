@@ -16,7 +16,7 @@ Two containers on one Vultr Cloud Compute VM: the **app** (API, web app, built-i
    ```
 3. **Run the setup script.**
    ```bash
-   export ANTHROPIC_API_KEY='sk-ant-...'
+   export VULTR_INFERENCE_API_KEY='...'   # Vultr Serverless Inference key; or export ANTHROPIC_API_KEY='sk-ant-...' to use Claude
    export REPO_URL="${REPO_URL:-https://github.com/AlexjrFS/halcyon-contabil.git}"
    bash /opt/halcyon-contabil/scripts/vultr-setup.sh
    ```
@@ -29,8 +29,11 @@ Run the script again after pushing new code: it pulls and rebuilds.
 
 | Variable | Meaning |
 |---|---|
-| `ANTHROPIC_API_KEY` | The agent's model key. Use a key made for this demo, with a spending limit set at the provider |
+| `VULTR_INFERENCE_API_KEY` | Key for Vultr Serverless Inference (create it in the Vultr console, Serverless Inference). Used when it is the only model key set, or when `LLM_PROVIDER=vultr` |
+| `VULTR_MODEL` | Optional. Default `kimi-k2-instruct`. Pick a model that supports tool calling |
+| `ANTHROPIC_API_KEY` | Alternative: a Claude key made for this demo, with a spending limit set at the provider |
 | `ANTHROPIC_MODEL` | Optional. Default `claude-haiku-5-5` |
+| `LLM_PROVIDER` | Optional. `vultr` or `anthropic` to force one when both keys are set |
 | `DOMAIN` | Public host name for Caddy |
 | `DEMO_TOKEN` | Optional access code. When set, every API route but `/health` needs it, and the web app asks for it |
 | `RATE_PER_MINUTE`, `CHAT_PER_HOUR_IP`, `CHAT_PER_HOUR_GLOBAL` | Demo limits (defaults 90, 40 and 200). The global one is the spending cap on model calls |
@@ -50,4 +53,4 @@ State lives in the `halcyon-contabil-data` volume (`rail.json`, `proposals.json`
 
 - **Vultr Cloud Compute VM**: the control layer. Agent loop, finance checks, policy, approvals, executor, payment rail and rate limits all run here. It is the system of record, not static hosting.
 - **Caddy**: terminates HTTPS and streams the chat answer through unbuffered.
-- **Anthropic API**: the only outside call, for the model. Everything it is told to do is limited to read tools and proposals.
+- **Model**: Vultr Serverless Inference (OpenAI-compatible chat with tool calling) or the Anthropic API. It is the only outside call. With Vultr, the whole stack runs on Vultr. Either way the model is limited to read tools and proposals.

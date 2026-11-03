@@ -3,7 +3,7 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { Readable } from 'node:stream'
 import { RailError } from '../rail/types.js'
-import { ChatMessages, converse, DEFAULT_MODEL, type ChatEvent } from '../agent/chat.js'
+import { activeModel, activeProvider, ChatMessages, converse, type ChatEvent } from '../agent/chat.js'
 import { ProposalError, type Proposal } from '../approvals/proposals.js'
 import type { Session } from '../app/session.js'
 import { formatUSD, type Cents } from '../policy/money.js'
@@ -109,7 +109,7 @@ export function createHandler(getSession: () => Promise<Session>, options: AppOp
     const is = (m: string, ...path: string[]) =>
       method === m && parts.length === path.length && path.every((p, i) => p === '*' || p === parts[i])
 
-    if (is('GET', 'health')) return json(200, { ok: true, model: process.env.ANTHROPIC_MODEL || DEFAULT_MODEL })
+    if (is('GET', 'health')) return json(200, { ok: true, provider: activeProvider(), model: activeModel() })
     if (options.token && request.headers.get('authorization') !== `Bearer ${options.token}`) {
       throw new HttpError(401, 'unauthorized', 'Missing or wrong demo token')
     }

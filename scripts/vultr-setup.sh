@@ -2,15 +2,20 @@
 # Sets up Halcyon-contabil on a fresh Ubuntu 24.04 Vultr VM and prints the public URL. Run as root. Safe to run again:
 # a second run pulls the latest code and rebuilds.
 #
-#   export ANTHROPIC_API_KEY=sk-ant-...
+#   export VULTR_INFERENCE_API_KEY=...        # Vultr Serverless Inference, or:
+#   export ANTHROPIC_API_KEY=sk-ant-...       # Claude
 #   export REPO_URL=https://github.com/AlexjrFS/halcyon-contabil.git      # public repo
 #   # private repo: use a read-only token in the URL: https://<user>:<token>@github.com/AlexjrFS/halcyon-contabil.git
 #   bash vultr-setup.sh
 #
-# Optional: DOMAIN (default <ip>.sslip.io), DEMO_TOKEN (access code for the API), ANTHROPIC_MODEL, APP_DIR.
+# Optional: DOMAIN (default <ip>.sslip.io), DEMO_TOKEN (access code for the API), LLM_PROVIDER, VULTR_MODEL,
+# ANTHROPIC_MODEL, APP_DIR.
 set -euo pipefail
 
-: "${ANTHROPIC_API_KEY:?Set ANTHROPIC_API_KEY first (export ANTHROPIC_API_KEY=...)}"
+if [ -z "${ANTHROPIC_API_KEY:-}" ] && [ -z "${VULTR_INFERENCE_API_KEY:-}" ]; then
+  echo "Set one model key first: export VULTR_INFERENCE_API_KEY=... (Vultr Serverless Inference) or export ANTHROPIC_API_KEY=..."
+  exit 1
+fi
 : "${REPO_URL:?Set REPO_URL first (see the header of this script)}"
 APP_DIR="${APP_DIR:-/opt/halcyon-contabil}"
 PUBLIC_URL="$(printf '%s' "$REPO_URL" | sed -E 's#(https://)[^@/]*@#\1#')"
@@ -46,8 +51,11 @@ fi
 if [ -z "${DEMO_TOKEN:-}" ] && [ -f .env ]; then DEMO_TOKEN="$(grep -E '^DEMO_TOKEN=' .env | cut -d= -f2- || true)"; fi
 umask 077
 cat > .env <<ENV
-ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
 ANTHROPIC_MODEL=${ANTHROPIC_MODEL:-}
+VULTR_INFERENCE_API_KEY=${VULTR_INFERENCE_API_KEY:-}
+VULTR_MODEL=${VULTR_MODEL:-}
+LLM_PROVIDER=${LLM_PROVIDER:-}
 DEMO_TOKEN=${DEMO_TOKEN:-}
 DOMAIN=${DOMAIN}
 ENV

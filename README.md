@@ -64,7 +64,7 @@ flowchart LR
 |---|---|
 | Web app (`public/`) | Plain HTML, CSS and JavaScript, no build step: books (payables, reconciliation, collections), chat, approval cards, card screen with test charges. `app/` is an optional Expo client for the same API |
 | API and web server (`src/server/`) | One Node process on the Vultr VM: a fetch-style handler on `node:http`, the chat streams NDJSON, static files for the web app, per-address and global rate limits |
-| Agent (`src/agent/`) | Claude through the Anthropic SDK tool runner, **Claude Haiku 5.5** by default (`ANTHROPIC_MODEL` to change) |
+| Agent (`src/agent/`) | One tool loop, two model providers: **Vultr Serverless Inference** (OpenAI-compatible, `VULTR_INFERENCE_API_KEY`) or **Claude** through the Anthropic SDK (Haiku 5.5 by default). The tools and the safety rules are identical |
 | Finance checks (`src/finance/`) | Anomaly rules, statement reconciliation, collection stages and reminder drafts. Plain TypeScript, integer cents, no model involved |
 | Decisions (`src/policy/`, `src/approvals/`) | Cash policy, card controls, proposals, fingerprints and the executor. Same rules |
 | Payment rail (`src/rail/`) | A built-in card issuer simulation: cards, controls, authorizations, limits. Provider-neutral `RailApi`; a real issuer plugs in by implementing it |
@@ -77,16 +77,16 @@ All data is synthetic; nothing touches real money.
 - **Vultr Cloud Compute** hosts the whole control layer: agent loop, policy, approvals, executor and the payment rail that decides every authorization. It is the system of record, not static hosting.
 - The VM runs two containers from `docker-compose.prod.yml`: the app (from `Dockerfile`) and **Caddy**, which terminates HTTPS. `scripts/vultr-setup.sh` sets up a fresh VM and prints the public URL; steps are in [`docs/DEPLOY-VULTR.md`](docs/DEPLOY-VULTR.md).
 - The VM also enforces the demo's limits (requests per minute, model calls per hour, per address and globally), so a public URL cannot run up the model bill.
-- Vultr Serverless Inference is optional for this challenge and is not used yet.
+- **Vultr Serverless Inference** can answer the chat (`VULTR_INFERENCE_API_KEY`), so the model call stays on Vultr too. It is optional for this challenge. The agent uses the OpenAI-compatible `/chat/completions` endpoint with tool calling, and the same read and propose-by-id tools as with Claude.
 
 ## Run it locally
 
-Requirements: Node.js 22 and an Anthropic API key (only for the chat).
+Requirements: Node.js 22 and one model key for the chat: a Vultr Serverless Inference key or an Anthropic API key.
 
 ```bash
 npm install
-cp .env.example .env   # ANTHROPIC_API_KEY
-npm test               # 76 tests, no network
+cp .env.example .env   # VULTR_INFERENCE_API_KEY or ANTHROPIC_API_KEY
+npm test               # 82 tests, no network
 npm run smoke          # the whole decision path with the built-in rail: card, approvals, declines, update, freeze
 npm run chat -- "Should we buy Framewise Team annual or monthly?"
 npm run chat -- --after-invoice "Process the December invoice from Framewise"
@@ -126,7 +126,7 @@ The optional Expo client lives in `app/` (`cd app && npm install && npx expo sta
 - [x] Web app served by the same server, with rate limits for a public demo
 - [x] Docker, Caddy and a setup script for a Vultr VM
 - [ ] Public deployment on a Vultr VM (URL above)
-- [ ] Optional: call Vultr Serverless Inference as a second model provider
+- [x] Vultr Serverless Inference as a second model provider
 - [ ] Recorded demo video and slides
 
 ## Origin
