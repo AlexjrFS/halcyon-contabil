@@ -15,6 +15,10 @@ import {
 } from '../approvals/proposals.js'
 import { AS_OF, cashPosition, COMPANY, OFFERS } from '../demo/company.js'
 import { INVOICES, type Invoice } from '../demo/invoices.js'
+import { LEDGER } from '../demo/ledger.js'
+import { reminderOutcome } from '../finance/followups.js'
+import { buildLedgerView } from '../finance/ledger.js'
+import type { LedgerData } from '../finance/types.js'
 import { toMajor, type Cents } from '../policy/money.js'
 import { emptyState, FileStateStore, type StateStore } from './state.js'
 
@@ -27,6 +31,7 @@ export interface SessionDeps {
   store: ProposalStore
   stateStore?: StateStore
   invoices?: Record<string, Invoice>
+  ledger?: LedgerData
   now?: () => Date
   newId?: () => string
   sleep?: (ms: number) => Promise<void>
@@ -63,11 +68,24 @@ export async function openSession(deps: SessionDeps) {
   const { api, store } = deps
   const stateStore = deps.stateStore ?? new FileStateStore()
   const invoices = deps.invoices ?? INVOICES
+  const ledgerData = deps.ledger ?? LEDGER
   const sleep = deps.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)))
   const state = await stateStore.load()
   const save = () => stateStore.save(state)
 
   const ctx: PolicyContext = { position: cashPosition, offers: { ...OFFERS }, now: deps.now, newId: deps.newId }
+  const sender = { name: `${COMPANY.founder.first_name} ${COMPANY.founder.last_name}`, company: COMPANY.name }
+  ctx.reminderFor = (receivableId) => reminderOutcome(ledgerData.receivables, state.reminders, AS_OF, sender, receivableId)
+  const now = deps.now ?? (() => new Date())
+  const ledgerView = () => buildLedgerView(ledgerData, state.reminders, AS_OF)
+  // The demo outbox: an approved reminder is recorded here instead of being emailed
+  const outbox = {
+    async send(message: { id: string; receivableId: string; stage: string; to: string; subject: string; body: string }) {
+      if (state.reminders.some((r) => r.id === message.id)) return
+      state.reminders.push({ ...message, stage: message.stage as 'friendly' | 'firm' | 'final', date: AS_OF, sentAt: now().toISOString() })
+      await save()
+    },
+  }
   // Replay the invoices already received so a restart keeps the current prices
   for (const id of state.invoices) {
     const invoice = invoices[id]
@@ -89,13 +107,14 @@ export async function openSession(deps: SessionDeps) {
     ctx,
     cardholderId,
     createdBy: `${COMPANY.founder.first_name} ${COMPANY.founder.last_name}`,
+    outbox,
   })
 
   async function record(proposal: Proposal) {
     const { action } = proposal
-    if (proposal.status !== 'executed' || action.kind === 'freeze_card') return
+    if (proposal.status !== 'executed' || action.kind === 'freeze_card' || action.kind === 'send_reminder') return
     if (action.kind === 'issue_card') {
-      state.cards[action.offerId] = { cardId: proposal.result!.cardId, plan: action.terms.plan, proposalId: proposal.id }
+      state.cards[action.offerId] = { cardId: proposal.result!.cardId!, plan: action.terms.plan, proposalId: proposal.id }
     } else {
       const card = state.cards[action.offerId]
       if (card) card.plan = action.terms.plan
@@ -107,9 +126,10 @@ export async function openSession(deps: SessionDeps) {
     ctx,
     store,
     state: () => structuredClone(state),
+    ledger: ledgerView,
 
     tools: (onProposal: (p: Proposal) => void) =>
-      agentTools({ store, ctx, invoices, cards: api, onProposal, cardFor: (offerId) => state.cards[offerId] }),
+      agentTools({ store, ctx, invoices, ledger: ledgerView, cards: api, onProposal, cardFor: (offerId) => state.cards[offerId] }),
 
     context: () =>
       conversationContext(

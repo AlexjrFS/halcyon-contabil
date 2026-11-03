@@ -17,7 +17,7 @@ const TYPES: Record<string, string> = {
 }
 
 // First path segments that belong to the API; everything else is the web app
-export const API_PREFIXES = ['health', 'chat', 'state', 'proposals', 'cards', 'invoices', 'charges', 'demo']
+export const API_PREFIXES = ['health', 'chat', 'state', 'proposals', 'cards', 'invoices', 'charges', 'demo', 'ledger']
 
 export const isApiPath = (pathname: string) => API_PREFIXES.includes(pathname.split('/').filter(Boolean)[0] ?? '')
 
@@ -30,7 +30,7 @@ export async function serveStatic(root: string, pathname: string): Promise<Respo
     try {
       const body = await readFile(file)
       const type = TYPES[extname(file)] ?? 'application/octet-stream'
-      return new Response(body, { headers: { 'content-type': type, 'cache-control': file.endsWith('.html') ? 'no-cache' : 'public, max-age=3600' } })
+      return new Response(body, { headers: { 'content-type': type, 'cache-control': ['.html', '.js', '.css'].includes(extname(file)) ? 'no-cache' : 'public, max-age=3600' } })
     } catch {}
   }
   return new Response('Not found', { status: 404 })

@@ -1,0 +1,35 @@
+# Production on a Vultr VM: the app plus Caddy for HTTPS.
+#   docker compose -f docker-compose.prod.yml up -d --build
+# Needs DOMAIN and ANTHROPIC_API_KEY in .env (scripts/vultr-setup.sh writes it). Local use: docker-compose.yml.
+services:
+  app:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATA_DIR: /data
+    expose:
+      - "3000"
+    volumes:
+      - halcyon-contabil-data:/data
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    depends_on:
+      app:
+        condition: service_healthy
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMAIN: ${DOMAIN:?set DOMAIN in .env}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+
+volumes:
+  halcyon-contabil-data:
+  caddy-data:
+  caddy-config:

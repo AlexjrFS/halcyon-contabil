@@ -152,3 +152,21 @@ test('with a demo token, everything but /health needs it', async () => {
     assert.equal((await call('GET', '/state', undefined, { authorization: 'Bearer s3cret' })).status, 200)
   }, 's3cret')
 })
+
+test('GET /ledger returns the books computed by code', async () => {
+  await withServer(async (call) => {
+    const res = await call('GET', '/ledger')
+    assert.equal(res.status, 200)
+    assert.equal(res.body.asOf, '2026-11-02')
+    assert.equal(res.body.payables.length, 16)
+    assert.equal(res.body.totals.flaggedBills, 4)
+    assert.equal(res.body.receivables.filter((r: { eligible: boolean }) => r.eligible).length, 3)
+  })
+})
+
+test('GET /ledger needs the demo token when one is set', async () => {
+  await withServer(async (call) => {
+    assert.equal((await call('GET', '/ledger')).status, 401)
+    assert.equal((await call('GET', '/ledger', undefined, { authorization: 'Bearer secret' })).status, 200)
+  }, 'secret')
+})

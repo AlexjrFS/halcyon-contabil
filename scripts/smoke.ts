@@ -43,7 +43,7 @@ for (const [kind, wanted] of [
 
 step('Price increase: the card refuses until a new approval')
 await session.receiveInvoice(PRICE_INCREASE.id)
-const update = await proposeCardUpdate(store, ctx, executed.result!.cardId, 'framewise', 'monthly')
+const update = await proposeCardUpdate(store, ctx, executed.result!.cardId!, 'framewise', 'monthly')
 if (update.kind !== 'proposal') throw new Error('expected an update proposal')
 await session.approve(update.proposal.id, update.proposal.fingerprint)
 const card = await session.card('framewise')
@@ -51,7 +51,7 @@ const card = await session.card('framewise')
 expect('limits after the update', card?.limits.limits.map((l) => l.remaining).join(','), '690,90')
 
 step('Freeze')
-const freeze = await proposeFreeze(store, ctx, executed.result!.cardId, 'suspicious invoice')
+const freeze = await proposeFreeze(store, ctx, executed.result!.cardId!, 'suspicious invoice')
 await session.approve(freeze.id, freeze.fingerprint)
 const frozen = await session.simulateCharge('framewise', { amount: 100 })
 expect('charge on a frozen card', frozen.failure_reason, 'CARD_NOT_ACTIVE')

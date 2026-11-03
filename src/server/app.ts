@@ -7,6 +7,7 @@ import { ChatMessages, converse, DEFAULT_MODEL, type ChatEvent } from '../agent/
 import { ProposalError, type Proposal } from '../approvals/proposals.js'
 import type { Session } from '../app/session.js'
 import { formatUSD, type Cents } from '../policy/money.js'
+import { createRateLimiter, type RateLimits } from './limits.js'
 
 export type Converse = typeof converse
 
@@ -14,6 +15,9 @@ export interface AppOptions {
   chat?: Converse
   // When set, every route but /health needs `Authorization: Bearer <token>`
   token?: string
+  // Public-demo limits; none when unset
+  limits?: RateLimits
+  clock?: () => number
 }
 
 const MAX_BODY = 64 * 1024
@@ -66,6 +70,7 @@ const describeProposal = (p: Proposal) => ({
 
 export function createHandler(getSession: () => Promise<Session>, options: AppOptions = {}) {
   const chat = options.chat ?? converse
+  const limiter = options.limits ? createRateLimiter(options.limits, options.clock) : undefined
 
   async function handleChat(request: Request, session: Session): Promise<Response> {
     const parsed = ChatMessages.safeParse((await readJson(request)).messages)
@@ -123,6 +128,8 @@ export function createHandler(getSession: () => Promise<Session>, options: AppOp
       return json(200, { ...session.state(), offers })
     }
 
+    if (is('GET', 'ledger')) return json(200, session.ledger())
+
     if (is('GET', 'proposals')) {
       const all = (await session.store.list()).sort((a, b) => b.createdAt.localeCompare(a.createdAt))
       return json(200, all.map(describeProposal))
@@ -164,6 +171,14 @@ export function createHandler(getSession: () => Promise<Session>, options: AppOp
 
   return async function handle(request: Request): Promise<Response> {
     if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS })
+    if (limiter) {
+      const wait = limiter(request.method, new URL(request.url).pathname, request.headers.get('x-client-ip') ?? 'unknown')
+      if (wait) {
+        const res = json(429, { error: 'rate_limited', message: `Too many requests. Try again in ${wait} s.`, retry_after: wait })
+        res.headers.set('retry-after', String(wait))
+        return res
+      }
+    }
     try {
       return await route(request)
     } catch (error) {
@@ -181,7 +196,10 @@ export function createHandler(getSession: () => Promise<Session>, options: AppOp
   }
 }
 
-// Local dev: serve the fetch handler from node:http, streaming the body as it is produced
+const clientIp = (req: IncomingMessage) =>
+  String(req.headers['x-forwarded-for'] ?? '').split(',')[0]?.trim() || req.socket.remoteAddress || 'unknown'
+
+// Serve the fetch handler from node:http, streaming the body as it is produced
 export function toNodeListener(handle: (request: Request) => Promise<Response>) {
   return async (req: IncomingMessage, res: ServerResponse) => {
     const abort = new AbortController()
@@ -189,7 +207,8 @@ export function toNodeListener(handle: (request: Request) => Promise<Response>) 
     const hasBody = req.method !== 'GET' && req.method !== 'HEAD'
     const request = new Request(`http://${req.headers.host ?? 'localhost'}${req.url ?? '/'}`, {
       method: req.method,
-      headers: req.headers as Record<string, string>,
+      // The address the limits count: what the reverse proxy saw, else the socket. Set here, never taken from the client
+      headers: { ...(req.headers as Record<string, string>), 'x-client-ip': clientIp(req) },
       body: hasBody ? (Readable.toWeb(req) as ReadableStream<Uint8Array>) : undefined,
       signal: abort.signal,
       // @ts-expect-error Node needs this for a streamed request body; not in the DOM typings

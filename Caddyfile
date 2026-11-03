@@ -1,0 +1,8 @@
+# HTTPS in front of the app. Caddy gets and renews the certificate on its own.
+# DOMAIN comes from .env, e.g. 203-0-113-7.sslip.io (a name that points at the VM's IP; no DNS setup needed).
+{$DOMAIN} {
+	reverse_proxy app:3000 {
+		# The chat streams its answer; do not buffer it
+		flush_interval -1
+	}
+}

@@ -2,6 +2,7 @@
 // offer and the cash policy; callers (including the model) pass only ids. An approval is bound to a fingerprint
 // of the exact terms shown, so nothing can change between "the founder saw it" and "the code ran it".
 import { createHash, randomUUID } from 'node:crypto'
+import type { RefusalReason, ReminderDraft, ReminderOutcome, ReminderStage } from '../finance/followups.js'
 import { chargeFor } from '../policy/card.js'
 import { comparePlans, type CashPosition, type PlanComparison, type Plan, type SubscriptionOffer } from '../policy/cash.js'
 import type { Cents } from '../policy/money.js'
@@ -24,6 +25,8 @@ export type Action =
   | { kind: 'issue_card'; offerId: string; terms: Terms }
   | { kind: 'update_card'; cardId: string; offerId: string; terms: Terms }
   | { kind: 'freeze_card'; cardId: string; reason: string }
+  // The exact email the founder read; nothing else can be sent under this approval
+  | { kind: 'send_reminder'; receivableId: string; stage: ReminderStage; to: string; subject: string; body: string }
 
 export type ProposalStatus =
   | 'pending'
@@ -46,7 +49,7 @@ export interface Proposal {
   expiresAt: string
   approvedAt?: string
   attempts: number
-  result?: { cardId: string }
+  result?: { cardId?: string; reminderId?: string }
   error?: { code: string; message: string }
 }
 
@@ -61,6 +64,8 @@ export interface ProposalStore {
 export interface PolicyContext {
   position: () => CashPosition
   offers: Record<string, SubscriptionOffer>
+  // Reminder wording and eligibility for a client invoice, from the books (set when follow-ups are available)
+  reminderFor?: (receivableId: string) => ReminderOutcome
   now?: () => Date
   newId?: () => string
 }
@@ -162,6 +167,26 @@ export const proposeCardUpdate = (
   offerId: string,
   currentPlan?: Plan,
 ) => proposeFromPolicy(store, ctx, offerId, (terms) => ({ kind: 'update_card', cardId, offerId, terms }), currentPlan)
+
+export const reminderAction = (draft: ReminderDraft): Action => ({
+  kind: 'send_reminder',
+  receivableId: draft.receivableId,
+  stage: draft.stage,
+  to: draft.to,
+  subject: draft.subject,
+  body: draft.body,
+})
+
+export type ReminderProposal = { kind: 'proposal'; proposal: Proposal } | { kind: 'refused'; reason: RefusalReason }
+
+// The wording comes from the books and the collection stage; the caller passes only the invoice id
+export async function proposeReminder(store: ProposalStore, ctx: PolicyContext, receivableId: string): Promise<ReminderProposal> {
+  const outcome = ctx.reminderFor?.(receivableId) ?? ({ kind: 'refused', reason: 'unknown_receivable' } as const)
+  if (outcome.kind === 'refused') return outcome
+  const proposal = newProposal(ctx, reminderAction(outcome.draft))
+  await store.save(proposal)
+  return { kind: 'proposal', proposal }
+}
 
 export async function proposeFreeze(store: ProposalStore, ctx: PolicyContext, cardId: string, reason: string) {
   const proposal = newProposal(ctx, { kind: 'freeze_card', cardId, reason })

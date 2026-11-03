@@ -6,6 +6,7 @@ import { cardRequest, cardUpdate, freezeCard } from '../policy/card.js'
 import {
   fingerprint,
   ProposalError,
+  reminderAction,
   termsFor,
   type PolicyContext,
   type Proposal,
@@ -14,6 +15,11 @@ import {
 
 export type CardApi = Pick<RailApi, 'createCard' | 'getCard' | 'updateCard' | 'listCards'>
 
+// Where approved reminders go. Idempotent on `id`, which is the proposal id
+export interface Outbox {
+  send(message: { id: string; receivableId: string; stage: string; to: string; subject: string; body: string }): Promise<void>
+}
+
 export interface ExecutorDeps {
   store: ProposalStore
   cards: CardApi
@@ -21,6 +27,7 @@ export interface ExecutorDeps {
   // A function when the cardholder is created lazily (on the first card)
   cardholderId: string | (() => Promise<string>)
   createdBy: string
+  outbox?: Outbox
 }
 
 // A rail answers a reused request_id with an error, not the original card. Adapters map their provider's
@@ -46,8 +53,17 @@ export function createExecutor(deps: ExecutorDeps) {
     }
   }
 
-  async function perform(proposal: Proposal): Promise<string> {
+  async function perform(proposal: Proposal): Promise<{ cardId?: string; reminderId?: string }> {
     const { action } = proposal
+    if (action.kind === 'send_reminder') {
+      if (!deps.outbox) throw new Error('No outbox is configured for reminders')
+      await deps.outbox.send({ id: proposal.id, receivableId: action.receivableId, stage: action.stage, to: action.to, subject: action.subject, body: action.body })
+      return { reminderId: proposal.id }
+    }
+    return { cardId: await performCard(proposal, action) }
+  }
+
+  async function performCard(proposal: Proposal, action: Exclude<Proposal['action'], { kind: 'send_reminder' }>): Promise<string> {
     if (action.kind === 'freeze_card') {
       await cards.updateCard(action.cardId, freezeCard())
       return action.cardId
@@ -79,7 +95,15 @@ export function createExecutor(deps: ExecutorDeps) {
     }
 
     const { action } = proposal
-    if (action.kind !== 'freeze_card') {
+    if (action.kind === 'send_reminder') {
+      // The invoice may have been paid, or reminded, since the founder read the text
+      const fresh = ctx.reminderFor?.(action.receivableId)
+      if (!fresh || fresh.kind !== 'draft' || fingerprint(reminderAction(fresh.draft)) !== proposal.fingerprint) {
+        proposal.status = 'stale'
+        await store.save(proposal)
+        return proposal
+      }
+    } else if (action.kind !== 'freeze_card') {
       const fresh = termsFor(ctx, action.offerId)
       if (fresh.kind === 'escalate' || fingerprint({ ...action, terms: fresh.terms }) !== proposal.fingerprint) {
         proposal.status = 'stale'
@@ -93,7 +117,7 @@ export function createExecutor(deps: ExecutorDeps) {
     delete proposal.error
     await store.save(proposal)
     try {
-      proposal.result = { cardId: await perform(proposal) }
+      proposal.result = await perform(proposal)
       proposal.status = 'executed'
     } catch (error) {
       proposal.status = 'failed'

@@ -1,0 +1,38 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run smoke
+
+  # Builds the image and checks that the container starts and answers /health (the Dockerfile is what runs on the VM)
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - run: docker build -t halcyon-contabil .
+      - name: Container answers /health and serves the web app
+        run: |
+          docker run -d --name hc -p 3000:3000 -e RATE_LIMIT=off halcyon-contabil
+          for i in $(seq 1 30); do curl -fsS localhost:3000/health && break; sleep 2; done
+          curl -fsS localhost:3000/ | grep -q "Halcyon-contabil"
+          curl -fsS localhost:3000/ledger | grep -q '"payables"'
+          docker stop hc
+      - name: Compose file is valid
+        run: DOMAIN=example.test docker compose -f docker-compose.prod.yml config > /dev/null

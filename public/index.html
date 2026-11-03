@@ -1,7 +1,59 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Halcyon-contabil</title></head>
-<body style="font-family: system-ui, sans-serif; max-width: 40rem; margin: 3rem auto; padding: 0 1rem">
-<h1>Halcyon-contabil</h1>
-<p>The model explains. Code decides. The card enforces.</p>
-<p>API is up: <a href="/health">/health</a>. The web app will be served here.</p>
-</body></html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Halcyon-contabil · AI finance agent</title>
+  <meta name="description" content="An AI finance agent that reviews invoices, reconciles payments and chases clients. The model explains, code decides, the card enforces.">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%231f5eff'/%3E%3Cpath d='M9 8v16M23 8v16M9 16h14' stroke='white' stroke-width='3.2' stroke-linecap='round' fill='none'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="/app.css">
+</head>
+<body>
+  <header class="top">
+    <div class="brand">
+      <span class="mark" aria-hidden="true">H</span>
+      <div>
+        <h1>Halcyon-contabil</h1>
+        <p class="tag">The model explains. Code decides. The card enforces.</p>
+      </div>
+    </div>
+    <div class="top-actions">
+      <span class="demo-note" id="demo-note">Lumen Studio · demo books dated Nov 2, 2026 · synthetic data</span>
+      <button class="btn ghost" id="reset" type="button">Reset demo</button>
+    </div>
+  </header>
+
+  <main class="layout">
+    <section class="work" aria-label="Books">
+      <nav class="tabs" id="tabs" role="tablist"></nav>
+      <div id="panel" class="panel" role="tabpanel"></div>
+    </section>
+
+    <aside class="agent" aria-label="Finance agent">
+      <h2>Finance agent</h2>
+      <div id="pending" class="pending"></div>
+      <div id="log" class="log" aria-live="polite"></div>
+      <div id="chips" class="chips"></div>
+      <form id="form" class="composer">
+        <label class="sr" for="input">Message to the finance agent</label>
+        <textarea id="input" rows="2" maxlength="3000" placeholder="Ask about invoices, payments or clients…"></textarea>
+        <button class="btn primary" id="send" type="submit">Send</button>
+      </form>
+      <p class="fine">The agent can read the books and propose actions. It cannot approve, pay or send anything: you do, on the cards above.</p>
+    </aside>
+  </main>
+
+  <div id="toast" class="toast" role="status" hidden></div>
+
+  <dialog id="gate">
+    <form method="dialog" id="gate-form">
+      <h3>Access code</h3>
+      <p>This demo asks for an access code.</p>
+      <input id="gate-input" type="password" autocomplete="off" required>
+      <div class="row"><button class="btn primary" type="submit">Enter</button></div>
+    </form>
+  </dialog>
+
+  <script src="/app.js" type="module"></script>
+</body>
+</html>

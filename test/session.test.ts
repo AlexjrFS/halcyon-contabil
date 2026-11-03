@@ -125,7 +125,7 @@ test('reset forgets proposals, cards and invoices but keeps the cardholder', asy
     await session.approve(proposal!.id, proposal!.fingerprint)
     await session.receiveInvoice(PRICE_INCREASE.id)
     await session.reset()
-    assert.deepEqual(session.state(), { cardholderId: 'holder-1', cards: {}, invoices: [] })
+    assert.deepEqual(session.state(), { cardholderId: 'holder-1', cards: {}, invoices: [], reminders: [] })
     assert.equal(session.ctx.offers.framewise!.monthlyPrice, cents(600))
     assert.deepEqual(await session.store.list(), [])
     await open(dir, api)

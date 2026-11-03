@@ -4,8 +4,11 @@ import type { Card } from '../src/rail/types.js'
 import { agentTools } from '../src/agent/tools.js'
 import type { PolicyContext, Proposal } from '../src/approvals/proposals.js'
 import { MemoryStore } from '../src/approvals/store.js'
-import { cashPosition, OFFERS } from '../src/demo/company.js'
+import { AS_OF, cashPosition, OFFERS } from '../src/demo/company.js'
 import { INJECTION, INVOICES } from '../src/demo/invoices.js'
+import { LEDGER } from '../src/demo/ledger.js'
+import { reminderOutcome } from '../src/finance/followups.js'
+import { buildLedgerView } from '../src/finance/ledger.js'
 import { cents } from '../src/policy/money.js'
 
 const card: Card = {
@@ -36,12 +39,14 @@ function setup(overrides: Partial<PolicyContext> = {}) {
     offers: { ...OFFERS },
     now: () => new Date('2026-11-02T12:00:00Z'),
     newId: () => `proposal-${++n}`,
+    reminderFor: (id) => reminderOutcome(LEDGER.receivables, [], AS_OF, { name: 'Ana Souza', company: 'Lumen Studio' }, id),
     ...overrides,
   }
   const tools = agentTools({
     store,
     ctx,
     invoices: INVOICES,
+    ledger: () => buildLedgerView(LEDGER, [], AS_OF),
     cards: { getCard: async () => card },
     onProposal: (p) => proposals.push(p),
   })
@@ -62,11 +67,15 @@ test('the model only gets read and propose tools, and none takes an amount or te
     'propose_card',
     'propose_card_update',
     'propose_freeze',
+    'propose_payment_reminder',
     'read_invoice',
+    'reconcile_payments',
+    'review_payables',
+    'review_receivables',
     'see_cash',
   ])
   const params = tools.flatMap((t) => Object.keys((t as { input_schema?: { properties?: object } }).input_schema?.properties ?? {}))
-  assert.deepEqual([...new Set(params)].sort(), ['card_id', 'invoice_id', 'offer_id', 'reason'])
+  assert.deepEqual([...new Set(params)].sort(), ['card_id', 'invoice_id', 'offer_id', 'only_flagged', 'reason', 'receivable_id'])
 })
 
 test('cash and plan numbers come formatted from code', async () => {
