@@ -35,4 +35,7 @@ jobs:
           curl -fsS localhost:3000/ledger | grep -q '"payables"'
           docker stop hc
       - name: Compose file is valid
-        run: DOMAIN=example.test docker compose -f docker-compose.prod.yml config > /dev/null
+        run: |
+          printf 'ANTHROPIC_API_KEY=ci-placeholder\nDOMAIN=example.test\n' > .env
+          docker compose -f docker-compose.prod.yml config > /dev/null
+          rm -f .env
