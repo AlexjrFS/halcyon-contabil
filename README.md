@@ -6,7 +6,7 @@ An AI finance agent for small businesses. It reads the books, **flags suspicious
 
 Built for the [Vultr: Agent Rush Hackathon](https://lablab.ai/ai-hackathons/vultr-hackathon), challenge 2 (*Powering the Future of Work*, finance and accounting: process supplier invoices, flag anomalies, manage payments).
 
-**Live demo:** _add the URL here after deploying_ · [Deploy guide](docs/DEPLOY-VULTR.md)
+**Live demo:** https://216-238-100-33.sslip.io · [Deploy guide](docs/DEPLOY-VULTR.md)
 
 ## The demo
 
@@ -125,7 +125,7 @@ The optional Expo client lives in `app/` (`cd app && npm install && npx expo sta
 - [x] Anomaly flags, reconciliation and payment follow-ups
 - [x] Web app served by the same server, with rate limits for a public demo
 - [x] Docker, Caddy and a setup script for a Vultr VM
-- [ ] Public deployment on a Vultr VM (URL above)
+- [x] Public deployment on a Vultr VM (URL above)
 - [x] Vultr Serverless Inference as a second model provider
 - [ ] Recorded demo video and slides
 

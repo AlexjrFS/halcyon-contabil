@@ -30,7 +30,7 @@ Run the script again after pushing new code: it pulls and rebuilds.
 | Variable | Meaning |
 |---|---|
 | `VULTR_INFERENCE_API_KEY` | Key for Vultr Serverless Inference (create it in the Vultr console, Serverless Inference). Used when it is the only model key set, or when `LLM_PROVIDER=vultr` |
-| `VULTR_MODEL` | Optional. Default `kimi-k2-instruct`. Pick a model that supports tool calling |
+| `VULTR_MODEL` | Optional. Default `glm-5.3`. Pick a model that supports tool calling |
 | `ANTHROPIC_API_KEY` | Alternative: a Claude key made for this demo, with a spending limit set at the provider |
 | `ANTHROPIC_MODEL` | Optional. Default `claude-haiku-5-5` |
 | `LLM_PROVIDER` | Optional. `vultr` or `anthropic` to force one when both keys are set |

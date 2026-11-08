@@ -8,7 +8,7 @@ import type { ChatEvent, ChatMessage } from './chat.js'
 
 export const VULTR_BASE_URL = 'https://api.vultrinference.com/v1'
 // The model named in Vultr's own tool-calling guide. The catalog changes: VULTR_MODEL overrides it
-export const DEFAULT_VULTR_MODEL = 'kimi-k2-instruct'
+export const DEFAULT_VULTR_MODEL = 'glm-5.3'
 
 const MAX_ITERATIONS = 8
 const REQUEST_TIMEOUT_MS = 60_000
